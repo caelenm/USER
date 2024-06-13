@@ -5,6 +5,8 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 import datetime
+import numpy as np
+from keras.preprocessing.image import img_to_array, load_img
 
 # Set the path to the spectrograms directory
 #spectrograms_dir = '/home/user/VQ-MAE-S-code/config_speech_vqvae/dataset/spectrograms'
@@ -17,6 +19,31 @@ import datetime
 # train_test_split_percentage = 0.8
 # train_data, test_data = train_test_split(os.listdir(spectrograms_dir), test_size=1-train_test_split_percentage, random_state=42)
 
+label_location =r'C:\Users\Caelen\Documents\GitHub\USER\emotion_vectors'
+
+class CustomGenerator(Sequence):
+    def __init__(self, image_filenames, labels, batch_size):
+        self.image_filenames = image_filenames
+        self.labels = labels
+        self.batch_size = batch_size
+
+    def __len__(self):
+        return (np.ceil(len(self.image_filenames) / float(self.batch_size))).astype(np.int)
+
+    def __getitem__(self, idx):
+        batch_x = self.image_filenames[idx * self.batch_size : (idx+1) * self.batch_size]
+        batch_y = self.labels[idx * self.batch_size : (idx+1) * self.batch_size]
+
+        return np.array([
+            img_to_array(load_img(file_name, target_size=(150, 150))) / 255.0 for file_name in batch_x]), np.array(batch_y)
+
+# for each text file in emotion_vectors, add it to a list of labels
+def getLabels(label_location):
+    labels = []
+    for file in os.listdir(label_location):
+        with open(file, 'r') as f:
+            for line in f:
+                labels.append(line)
 
 def train(train_data_dir, test_data_dir):
 
@@ -30,19 +57,24 @@ def train(train_data_dir, test_data_dir):
     target_size = (150, 150)
     batch_size = 32
 
-    # Generate training and testing data using the ImageDataGenerator
-    train_generator = datagen.flow_from_directory(
-        train_data_dir,
-        target_size=target_size,
-        class_mode='raw',
-        batch_size=batch_size
-        #subset='training'
-    )
+    labels = getLabels(label_location)
+
+
+    train_generator = CustomGenerator()
+
+    # # Generate training and testing data using the ImageDataGenerator
+    # train_generator = datagen.flow_from_directory(
+    #     train_data_dir,
+    #     target_size=target_size,
+    #     class_mode= None,
+    #     batch_size=batch_size
+    #     #subset='training'
+    # )
 
     test_generator = datagen.flow_from_directory(
         test_data_dir,
         target_size=target_size,
-        class_mode='None',
+        class_mode= None,
         batch_size=batch_size
         #subset='validation'
     )
@@ -58,7 +90,7 @@ def train(train_data_dir, test_data_dir):
     model.add(Dense(300))
 
     # Compile the model
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy', 'mae', 'mse', 'mape', 'cosine_similarity',])
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy', 'cosine_similarity'])
 
     # Define the model checkpoint criteria
     now = datetime.datetime.now()
