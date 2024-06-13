@@ -41,12 +41,64 @@ class CustomGenerator(Sequence):
 def getLabels(label_location):
     labels = []
     for file in os.listdir(label_location):
+        vector = []
         with open(file, 'r') as f:
             for line in f:
-                labels.append(line)
+                line = line.to_float()
+                vector.append(line)
+        labels.append(vector)
+    return labels
+
+def create_dataframe(images_dir, labels):
+    #images_dir is location of emotion subfolders
+    #labels is list of emotion vectors
+
+    dataframe = pd.DataFrame(columns=['image', 'label'])
+    for folder in images_dir:
+        for file in os.listdir(folder):
+            get_emotion_vector(file)
+            dataframe.append({'image': file, 'label': get_emotion_vector(file)}, ignore_index=True)
+        return dataframe
+
+
+    return
+def get_emotion_vector(filename):
+     # Split the string by hyphen
+    parts = filename.split('-')
+    
+    # Extract the third number (index 2 since indexing starts at 0)
+    third_number = parts[2]
+    
+    # Initialize an empty vector
+    emotion_vector_label = None
+    # Assign vector based on the third number
+    if third_number == '05':
+        emotion_vector_label = 'angry'
+    elif third_number == '02':
+        emotion_vector_label = 'calm'
+    elif third_number == '07':
+        emotion_vector_label = 'disgust'
+    elif third_number == '06':
+        emotion_vector_label = 'fearful'
+    elif third_number == '03':
+        emotion_vector_label = 'happy'
+    elif third_number == '01':
+        emotion_vector_label = 'neutral'
+    elif third_number == '04':
+        emotion_vector_label = 'sad'
+    elif third_number == '08':
+        emotion_vector_label = 'surprised'
+    
+    # read in emotion vector and return it
+    emotion_vector = []
+    for f in os.listdir(label_location):
+        if emotion_vector_label in filename:
+            with open(os.path.join(label_location, f), 'r') as v:
+                emotion_vector.extend(v.readlines())
+    return emotion_vector
+
 
 def train(train_data_dir, test_data_dir):
-
     # Define the early stopping criteria
     early_stopping = EarlyStopping(monitor='val_loss', patience=40)
 
@@ -58,7 +110,7 @@ def train(train_data_dir, test_data_dir):
     batch_size = 32
 
     labels = getLabels(label_location)
-
+    
 
     train_generator = CustomGenerator()
 
