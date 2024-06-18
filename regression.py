@@ -7,6 +7,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 import datetime
 import numpy as np
 from keras.preprocessing.image import img_to_array, load_img
+from tensorflow.keras.utils import Sequence
 
 # Set the path to the spectrograms directory
 #spectrograms_dir = '/home/user/VQ-MAE-S-code/config_speech_vqvae/dataset/spectrograms'
@@ -20,6 +21,7 @@ from keras.preprocessing.image import img_to_array, load_img
 # train_data, test_data = train_test_split(os.listdir(spectrograms_dir), test_size=1-train_test_split_percentage, random_state=42)
 
 label_location =r'C:\Users\Caelen\Documents\GitHub\USER\emotion_vectors'
+train_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\train_png'
 
 class CustomGenerator(Sequence):
     def __init__(self, image_filenames, labels, batch_size):
@@ -28,23 +30,26 @@ class CustomGenerator(Sequence):
         self.batch_size = batch_size
 
     def __len__(self):
-        return (np.ceil(len(self.image_filenames) / float(self.batch_size))).astype(np.int)
+        return int((np.ceil(len(self.image_filenames) / float(self.batch_size))))
 
     def __getitem__(self, idx):
         batch_x = self.image_filenames[idx * self.batch_size : (idx+1) * self.batch_size]
         batch_y = self.labels[idx * self.batch_size : (idx+1) * self.batch_size]
+        batch_x_paths = [os.path.join(train_directory, file_name) for file_name in batch_x]
 
         return np.array([
-            img_to_array(load_img(file_name, target_size=(150, 150))) / 255.0 for file_name in batch_x]), np.array(batch_y)
-
+        img_to_array(load_img(file_path, target_size=(150, 150))) / 255.0 for file_path in batch_x_paths
+    ]), np.array(batch_y)
+    
 # for each text file in emotion_vectors, add it to a list of labels
 def getLabels(label_location):
     labels = []
     for file in os.listdir(label_location):
         vector = []
-        with open(file, 'r') as f:
+        file_path = os.path.join(label_location, file)
+        with open(file_path, 'r') as f:
             for line in f:
-                line = line.to_float()
+                line = float(line.strip())
                 vector.append(line)
         labels.append(vector)
     return labels
@@ -110,9 +115,9 @@ def train(train_data_dir, test_data_dir):
     batch_size = 32
 
     labels = getLabels(label_location)
-    
 
-    train_generator = CustomGenerator()
+
+    train_generator = CustomGenerator(train_data_dir, labels, batch_size)
 
     # # Generate training and testing data using the ImageDataGenerator
     # train_generator = datagen.flow_from_directory(
