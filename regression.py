@@ -24,10 +24,11 @@ label_location =r'C:\Users\Caelen\Documents\GitHub\USER\emotion_vectors'
 train_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\train_png'
 
 class CustomGenerator(Sequence):
-    def __init__(self, image_filenames, labels, batch_size):
+    def __init__(self, image_filenames, labels, batch_size,  train_directory ):
         self.image_filenames = image_filenames
         self.labels = labels
         self.batch_size = batch_size
+        self.train_directory = train_directory
 
     def __len__(self):
         return int((np.ceil(len(self.image_filenames) / float(self.batch_size))))
@@ -37,10 +38,13 @@ class CustomGenerator(Sequence):
         batch_y = self.labels[idx * self.batch_size : (idx+1) * self.batch_size]
         batch_x_paths = [os.path.join(train_directory, file_name) for file_name in batch_x]
 
-        return np.array([
-        img_to_array(load_img(file_path, target_size=(150, 150))) / 255.0 for file_path in batch_x_paths
-    ]), np.array(batch_y)
-    
+        images = []
+        for file_path in batch_x_paths:
+            image = img_to_array(load_img(file_path, target_size=(150, 150))) / 255.0
+            images.append(image)
+
+        return np.array(images), np.array(batch_y)
+
 # for each text file in emotion_vectors, add it to a list of labels
 def getLabels(label_location):
     labels = []
@@ -117,7 +121,7 @@ def train(train_data_dir, test_data_dir):
     labels = getLabels(label_location)
 
 
-    train_generator = CustomGenerator(train_data_dir, labels, batch_size)
+    train_generator = CustomGenerator(train_data_dir, labels, batch_size, train_directory)
 
     # # Generate training and testing data using the ImageDataGenerator
     # train_generator = datagen.flow_from_directory(
