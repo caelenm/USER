@@ -1,7 +1,7 @@
 def main():
     import os
     #from splitFiles import split_files
-    from rv5 import train
+    from torch_regression import train
     target_directory_sorted = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\spectrograms_sortedByMood_png'
     train_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\train_png'
     test_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\test_png'
