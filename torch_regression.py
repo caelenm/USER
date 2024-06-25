@@ -9,7 +9,7 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 
 label_location = r'C:\Users\Caelen\Documents\GitHub\USER\emotion_vectors'
-all_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\all_png'
+all_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\spectrograms_sortedByMood_png'
 
 # Define the CNN model
 class CNNRegression(nn.Module):
@@ -111,6 +111,15 @@ def train(all_directory, label_location):
     torch.manual_seed(random_seed)
 
     # split into train and test
+    train_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\train_png'
+    test_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\test_png'
+
+    # for folder in all directory
+        # for file in folder
+            # split 80/20 randomly from seed
+            # move file to train/test directory
+   
+
 
     # Create dataset
     dataset = RegressionDataset(
