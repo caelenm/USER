@@ -109,8 +109,8 @@ def train(all_directory, label_location):
     #split int test and train
     random_seed = 42
     torch.manual_seed(random_seed)
-    
 
+    # split into train and test
 
     # Create dataset
     dataset = RegressionDataset(
