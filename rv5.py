@@ -11,7 +11,9 @@ from keras.preprocessing.image import img_to_array, load_img
 from tensorflow.keras.utils import Sequence
 
 label_location = r'C:\Users\Caelen\Documents\GitHub\USER\emotion_vectors'
+all_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\spectrograms_sortedByMood_png'
 train_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\train_png'
+test_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\test_png'
 log_file = 'debug_log.txt'
 
 # Set up logging with rotation
@@ -21,11 +23,8 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s', handl
 def getLabels(label_location):
     label_mapping = {}
     for file in os.listdir(label_location):
-        vector = []
         file_path = os.path.join(label_location, file)
-        with open(file_path, 'r') as f:
-            for line in f:
-                vector.append(float(line.strip()))
+        vector = np.loadtxt(file_path)
         emotion = file.split('.')[0]  # assuming file is named like 'angry.txt'
         label_mapping[emotion] = vector
     logging.debug(f'Label mapping: {label_mapping}')  # Debug: Log all label mappings
@@ -55,17 +54,19 @@ def get_emotion_vector(filename):
 
     return emotion_vector_label
 
-def create_filename_label_mapping(train_directory, label_mapping):
+def create_filename_label_mapping(all_directory, label_mapping):
 ## label is one of options in get_emotion_vector
 ## missing labels are not an option
     filename_label_mapping = {}
-    for filename in os.listdir(train_directory):
-        emotion_vector_label = get_emotion_vector(filename)
-        filename_label_mapping[filename] = label_mapping[emotion_vector_label]
-        logging.debug(f'Filename label mapping: {filename_label_mapping}')  # Debug: Log all filename label mappings
+    for folder in os.listdir(all_directory):
+        filenames = [f for f in os.listdir(os.path.join(all_directory, folder))]
+        for f in filenames:
+            emotion_vector_label = get_emotion_vector(f)
+            filename_label_mapping[f] = label_mapping[emotion_vector_label]
+            logging.debug(f'Filename label mapping: {filename_label_mapping}')  # Debug: Log all filename label mappings
     return filename_label_mapping
 
-class CustomGenerator(Sequence):
+class CustomTrainGenerator(Sequence):
     def __init__(self, image_filenames, label_mapping, batch_size, train_directory):
         self.image_filenames = image_filenames
         self.label_mapping = label_mapping
@@ -92,6 +93,33 @@ class CustomGenerator(Sequence):
             
         return np.array(images), np.array(batch_y)
 
+class CustomTestGenerator(Sequence):
+    def __init__(self, image_filenames, label_mapping, batch_size, test_directory):
+        self.image_filenames = image_filenames
+        self.label_mapping = label_mapping
+        self.batch_size = batch_size
+        self.test_directory = test_directory
+
+    def __len__(self):
+        ## returns the number of batches per epoch
+        return int(np.ceil(len(self.image_filenames) / float(self.batch_size)))
+
+    def __getitem__(self, idx):
+       ## yields batches of images and labels
+        batch_x = self.image_filenames[idx * self.batch_size: (idx + 1) * self.batch_size]
+        batch_y = [self.label_mapping[filename] for filename in batch_x]
+        batch_x_paths = [os.path.join(self.test_directory, file_name) for file_name in batch_x]
+
+        images = []
+        for file_path in batch_x_paths:
+            if os.path.exists(file_path):
+                image = img_to_array(load_img(file_path, target_size=(150, 150))) / 255.0
+                images.append(image)
+            else:
+                raise FileNotFoundError(f"No such file or directory: '{file_path}'")
+            
+        return np.array(images), np.array(batch_y)
+
 def train(train_data_dir, test_data_dir):
     early_stopping = EarlyStopping(monitor='val_loss', patience=40)
     datagen = ImageDataGenerator(rescale=1. / 255)
@@ -99,13 +127,25 @@ def train(train_data_dir, test_data_dir):
     batch_size = 32
 
     label_mapping = getLabels(label_location)
-    filename_label_mapping = create_filename_label_mapping(train_data_dir, label_mapping)
+    filename_label_mapping = create_filename_label_mapping(all_directory, label_mapping)
 
-    train_filenames = list(filename_label_mapping.keys())
-    logging.debug(f'Total training files: {len(train_filenames)}')  # Debug: Log total training files
-    logging.debug(f'Sample training file: {train_filenames[0]} with label {filename_label_mapping[train_filenames[0]]}')  # Debug: Log sample file and label
+    all_filenames = list(filename_label_mapping.keys())
+    #make random seed
+    np.random.seed(42)
+    # take 80 percent of each subfolder for training, 20 percent for testing
+    for folder in os.listdir(all_directory):
+        filenames = [f for f in os.listdir(os.path.join(all_directory, folder)) if f.endswith('.png')]
+        np.random.shuffle(filenames)
+        split_index = int(0.8 * len(filenames))
+        train_filenames = filenames[:split_index]
+        test_filenames = filenames[split_index:]
+    print(f'Total training files: {len(train_filenames)}')
+    print(f'total test files: {len(test_filenames)}')
+  #  logging.debug(f'Total training files: {len(train_filenames)}')  # Debug: Log total training files
+    #logging.debug(f'Sample training file: {train_filenames[0]} with label {filename_label_mapping[train_filenames[0]]}')  # Debug: Log sample file and label
 
-    train_generator = CustomGenerator(train_filenames, filename_label_mapping, batch_size, train_directory)
+    train_generator = CustomTrainGenerator(train_filenames, filename_label_mapping, batch_size, train_directory)
+    test_generator = CustomTestGenerator(test_filenames, filename_label_mapping, batch_size, test_directory)
 
     test_generator = datagen.flow_from_directory(
         test_data_dir,
