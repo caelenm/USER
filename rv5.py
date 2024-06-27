@@ -9,11 +9,12 @@ import datetime
 import numpy as np
 from keras.preprocessing.image import img_to_array, load_img
 from tensorflow.keras.utils import Sequence
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 label_location = r'C:\Users\Caelen\Documents\GitHub\USER\emotion_vectors'
 all_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\spectrograms_sortedByMood_png'
-train_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\train_png'
-test_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\test_png'
+train_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\train_png_original'
+test_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\test_png_original'
 log_file = 'debug_log.txt'
 
 # Set up logging with rotation
@@ -81,16 +82,13 @@ class CustomTrainGenerator(Sequence):
        ## yields batches of images and labels
         batch_x = self.image_filenames[idx * self.batch_size: (idx + 1) * self.batch_size]
         batch_y = [self.label_mapping[filename] for filename in batch_x]
-        batch_x_paths = [os.path.join(self.train_directory, file_name) for file_name in batch_x]
+        batch_x_paths = [os.path.join(self.train_directory, get_emotion_vector(file_name) + "_png", file_name) for file_name in batch_x]
 
         images = []
         for file_path in batch_x_paths:
-            if os.path.exists(file_path):
-                image = img_to_array(load_img(file_path, target_size=(150, 150))) / 255.0
-                images.append(image)
-            else:
-                raise FileNotFoundError(f"No such file or directory: '{file_path}'")
-            
+            image = img_to_array(load_img(file_path, target_size=(150, 150))) / 255.0
+            images.append(image)
+        
         return np.array(images), np.array(batch_y)
 
 class CustomTestGenerator(Sequence):
@@ -108,16 +106,13 @@ class CustomTestGenerator(Sequence):
        ## yields batches of images and labels
         batch_x = self.image_filenames[idx * self.batch_size: (idx + 1) * self.batch_size]
         batch_y = [self.label_mapping[filename] for filename in batch_x]
-        batch_x_paths = [os.path.join(self.test_directory, file_name) for file_name in batch_x]
+        batch_x_paths = [os.path.join(self.test_directory, get_emotion_vector(file_name) + "_png", file_name) for file_name in batch_x]
 
         images = []
         for file_path in batch_x_paths:
-            if os.path.exists(file_path):
-                image = img_to_array(load_img(file_path, target_size=(150, 150))) / 255.0
-                images.append(image)
-            else:
-                raise FileNotFoundError(f"No such file or directory: '{file_path}'")
-            
+            image = img_to_array(load_img(file_path, target_size=(150, 150))) / 255.0
+            images.append(image)
+        
         return np.array(images), np.array(batch_y)
 
 def train(train_data_dir, test_data_dir):
@@ -144,16 +139,7 @@ def train(train_data_dir, test_data_dir):
   #  logging.debug(f'Total training files: {len(train_filenames)}')  # Debug: Log total training files
     #logging.debug(f'Sample training file: {train_filenames[0]} with label {filename_label_mapping[train_filenames[0]]}')  # Debug: Log sample file and label
 
-    train_generator = CustomTrainGenerator(train_filenames, filename_label_mapping, batch_size, train_directory)
-    test_generator = CustomTestGenerator(test_filenames, filename_label_mapping, batch_size, test_directory)
-
-    test_generator = datagen.flow_from_directory(
-        test_data_dir,
-        target_size=target_size,
-        class_mode=None,
-        batch_size=batch_size
-    )
-
+   
     model = Sequential()
     model.add(Input(shape=(target_size[0], target_size[1], 3)))
     model.add(Conv2D(32, (3, 3), activation='relu'))
@@ -170,10 +156,23 @@ def train(train_data_dir, test_data_dir):
     model_path = f'trained/model_{now.strftime("%Y%m%d%H%M%S")}.keras'
     model_checkpoint = ModelCheckpoint(model_path, monitor='val_loss', save_best_only=True)
 
+    #filename label mapping for training and testing
+    #init separate mappings for each
+    train_filename_label_mappings = {}
+    test_filename_label_mappings = {}
+    for key, value in filename_label_mapping.items():
+        if key in train_filenames:
+            train_filename_label_mappings[key] = value
+        elif key in test_filenames:
+            test_filename_label_mappings[key] = value
+    
+
     history = model.fit(
-        train_generator,
+        x = CustomTrainGenerator(train_filenames, train_filename_label_mappings, batch_size, train_directory),
         epochs=200,
-        validation_data=test_generator,
+        #use_multiprocessing=True,
+        #workers=8,
+        validation_data=CustomTestGenerator(test_filenames, test_filename_label_mappings, batch_size, test_directory),
         verbose=2,
         callbacks=[early_stopping, model_checkpoint]
     )
