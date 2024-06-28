@@ -126,7 +126,13 @@ def train():
     #filename_label_mapping = create_filename_label_mapping(all_directory, label_mapping)
     # with open('~/filename_label_mapping.pkl', 'wb') as f:
     #     pickle.dump(filename_label_mapping, f)
-    with open('~/filename_label_mapping.pkl', 'rb') as f:
+    # if pickle does not exist, create it
+    if not os.path.exists('filename_label_mapping.pkl'):
+        filename_label_mapping = create_filename_label_mapping(all_directory, label_mapping)
+        with open('filename_label_mapping.pkl', 'wb') as f:
+            #save
+            pickle.dump(filename_label_mapping, f)
+    with open('filename_label_mapping.pkl', 'rb') as f:
         #load
         filename_label_mapping = pickle.load(f)
     print("b")
@@ -168,11 +174,17 @@ def train():
     #init separate mappings for each
     train_filename_label_mappings = {}
     test_filename_label_mappings = {}
+    # add files from train_png_original and test_png_original to the mappings
     for key, value in filename_label_mapping.items():
         if key in train_filenames:
             train_filename_label_mappings[key] = value
         elif key in test_filenames:
             test_filename_label_mappings[key] = value
+            # for key, value in filename_label_mapping.items():
+            #     if key in train_filenames:
+            #         train_filename_label_mappings[key] = value
+            #     elif key in test_filenames:
+            #         test_filename_label_mappings[key] = value
     
 
     history = model.fit(
@@ -186,5 +198,6 @@ def train():
     )
 
     logging.debug(f'Best model saved to {model_path}')
+    print(f'Best model saved to {model_path}')
 
     return model_path
