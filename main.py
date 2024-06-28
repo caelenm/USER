@@ -15,7 +15,7 @@ def main():
     #remember to set seed for reproducibility
 
 
-    train(train_directory, test_directory)
+    train()
     print("end of main")
 
 if __name__ == '__main__':

@@ -10,6 +10,7 @@ import numpy as np
 from keras.preprocessing.image import img_to_array, load_img
 from tensorflow.keras.utils import Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import pickle
 
 label_location = r'C:\Users\Caelen\Documents\GitHub\USER\emotion_vectors'
 all_directory = r'C:\Users\Caelen\Documents\VQ-MAE-S-code\config_speech_vqvae\dataset\spectrograms_sortedByMood_png'
@@ -63,7 +64,7 @@ def create_filename_label_mapping(all_directory, label_mapping):
         filenames = [f for f in os.listdir(os.path.join(all_directory, folder))]
         for f in filenames:
             emotion_vector_label = get_emotion_vector(f)
-            filename_label_mapping[f] = label_mapping[emotion_vector_label]
+            filename_label_mapping[f] = label_mapping[emotion_vector_label] #os.basename(f) in place of [f]?
             logging.debug(f'Filename label mapping: {filename_label_mapping}')  # Debug: Log all filename label mappings
     return filename_label_mapping
 
@@ -115,25 +116,32 @@ class CustomTestGenerator(Sequence):
         
         return np.array(images), np.array(batch_y)
 
-def train(train_data_dir, test_data_dir):
+def train():
     early_stopping = EarlyStopping(monitor='val_loss', patience=40)
     datagen = ImageDataGenerator(rescale=1. / 255)
     target_size = (150, 150)
     batch_size = 32
-
+    print("a")
     label_mapping = getLabels(label_location)
-    filename_label_mapping = create_filename_label_mapping(all_directory, label_mapping)
-
+    #filename_label_mapping = create_filename_label_mapping(all_directory, label_mapping)
+    # with open('~/filename_label_mapping.pkl', 'wb') as f:
+    #     pickle.dump(filename_label_mapping, f)
+    with open('~/filename_label_mapping.pkl', 'rb') as f:
+        #load
+        filename_label_mapping = pickle.load(f)
+    print("b")
     all_filenames = list(filename_label_mapping.keys())
     #make random seed
     np.random.seed(42)
     # take 80 percent of each subfolder for training, 20 percent for testing
-    for folder in os.listdir(all_directory):
-        filenames = [f for f in os.listdir(os.path.join(all_directory, folder)) if f.endswith('.png')]
-        np.random.shuffle(filenames)
-        split_index = int(0.8 * len(filenames))
-        train_filenames = filenames[:split_index]
-        test_filenames = filenames[split_index:]
+                # for folder in os.listdir(all_directory):
+                #     filenames = [f for f in os.listdir(os.path.join(all_directory, folder)) if f.endswith('.png')]
+                #     np.random.shuffle(filenames)
+                #     split_index = int(0.8 * len(filenames))
+                #     train_filenames = filenames[:split_index]
+                #     test_filenames = filenames[split_index:]
+    train_filenames=[f for f in os.listdir(train_directory) if f.endswith('.png')]
+    test_filenames=[f for f in os.listdir(test_directory) if f.endswith('.png')]
     print(f'Total training files: {len(train_filenames)}')
     print(f'total test files: {len(test_filenames)}')
   #  logging.debug(f'Total training files: {len(train_filenames)}')  # Debug: Log total training files
@@ -170,8 +178,8 @@ def train(train_data_dir, test_data_dir):
     history = model.fit(
         x = CustomTrainGenerator(train_filenames, train_filename_label_mappings, batch_size, train_directory),
         epochs=200,
-        #use_multiprocessing=True,
-        #workers=8,
+        # use_multiprocessing=True,
+        # workers=8,
         validation_data=CustomTestGenerator(test_filenames, test_filename_label_mappings, batch_size, test_directory),
         verbose=2,
         callbacks=[early_stopping, model_checkpoint]
